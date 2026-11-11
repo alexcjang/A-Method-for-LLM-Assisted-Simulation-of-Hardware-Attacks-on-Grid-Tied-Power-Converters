@@ -1,0 +1,80 @@
+You are generating or modifying an RSCAD FX case file for a power-system simulation. The goal is to add a cyber-physical attack that is manually enabled by the user, not automatically active at runtime.
+
+Core constraints:
+
+Start from a known-good baseline RSCAD case and make only the minimal necessary edits.
+Preserve all existing valid component IDs, signal names, and internal wiring unless the edit is explicitly required for the attack.
+Add a manual enable/disable control for the attack, such as a switch, logic gate, constant, or user-controlled signal.
+The attack must be inactive by default when the enable signal is off or false.
+When the enable signal is on, the injected attack must affect only the intended signal path.
+Do not create orphan signals or undefined inputs.
+Verify actual component-pin geometry. Do not infer input/output pin locations from component centers, symbol appearance, or other block types. Obtain the exact terminal coordinates for the selected component configuration and orientation from its definition or an identical, correctly wired baseline instance. Every wire must terminate exactly on its intended pin.
+Check every component input, including reset and auxiliary inputs. Do not assume that a time-source or waveform-generation block has no inputs.
+Every block input must have exactly one valid source output in the same case.
+Use exact signal names wherever the original model expects them.
+Keep the original system behavior unchanged when the attack is disabled.
+The final case must compile cleanly without internal connection errors.
+Attack specification:
+
+“Implement a manually toggled measurement error on phase A of the solar inverter. The inverter should see an additional bias of 0.12 kV at 60 Hz on phase A only when the attack is enabled. When disabled, the original measurement path remains unchanged.”
+
+Important design requirement:
+
+Add a dedicated enable signal or control input for the attack.
+The attack must not begin automatically at simulation startup.
+The user should be able to turn the attack on/off manually during the run.
+The attack block should be inserted in the measurement path, not as a separate floating net.
+If the original case has no suitable control mechanism, add the smallest valid control element needed to gate the attack.
+Required output:
+
+The final RSCAD case file.
+Clear labeling of the attack-enable signal and the injected phase-A error path.
+A short connectivity check showing:
+the attack-enable source
+the measurement input being modified
+the output feeding the downstream model
+proof that all inputs are driven by valid outputs
+If there is any ambiguity in the case structure, explain the assumption and keep the modification minimal.
+Final validation rule:
+
+No undefined signals
+No mismatched input/output names
+No unconnected or “not found as an output from any component” errors
+Case remains compilable in RSCAD with the attack off by default and turn-on controlled manually
+
+Additional requirement: Python-script compatibility
+
+All newly added attack, control, and monitoring blocks must be connected and exposed so that the following existing Python lookups work without renaming objects or changing signal paths in the script:
+
+    import rtds.rscadfx
+    from rtds.constants import SLIDER
+
+    case = app.open_case("Microgrid1_test.rtfx")
+    atk_slider = case.get_object_by_name("ATK_MAG_3phase", SLIDER)
+    sig_prt8 = case.get_signal("Subsystem #1|CTLs|Vars|PROTECT8")
+    sig_vrms_meas = case.get_signal("Subsystem #1|CTLs|Vars|VPROT8")
+    sig_vrms_real = case.get_signal("Subsystem #1|CTLs|Vars|VLOADRMS8_Real")
+    sig_vpeak_real = case.get_signal("Subsystem #1|Node Voltages|S1) VSAA8")
+
+Save the output as Microgrid1_test.rtfx, preserving the original case separately.
+
+Create an actual Runtime SLIDER named ATK_MAG_3phase, backed by a valid source in the model. A wire label alone is not sufficient. Its value must control the peak amplitude of the phase-A additive 60 Hz error in kV. Support the script's sweep values [0.01, 0.05, 0.07, 0.12, 0.20]. Setting it to 0.12 must implement the attack specified above. Verify signal units and apply any necessary conversion correctly.
+
+Use this slider as the dedicated manual/script attack control: 0.0 means disabled; a positive value enables the attack at that magnitude; returning it to 0.0 disables the attack. Set both the model initialization and saved Runtime slider value to 0.0. The script changes only atk_slider.value, so do not place an additional independent enable switch in series that must be operated before the slider can affect the measurement. Any internal enable logic must follow the slider value and preserve the default-off behavior.
+
+The names ATK_MAG_3phase and the script's attack_type string are legacy identifiers. They do not authorize injecting into phases B or C. The attack remains phase-A-only.
+
+Preserve or expose the requested signals with these meanings:
+
+- PROTECT8: the target inverter's actual protection trip status, 0 for not tripped and 1 for tripped. Do not synthesize or force this output.
+- VPROT8: the actual per-unit voltage signal used by the target voltage-protection path, retaining its existing startup/blocking behavior. Although the script labels its CSV column V_RMS_Meas, this signal is per unit; do not redefine it as kV merely to match the column title.
+- VLOADRMS8_Real: three-phase line-line RMS voltage in kV, measured from the uncorrupted physical bus voltages. Reuse an appropriate existing monitor or add the smallest valid RMS monitor. Expose its RMS output directly, without adding a low-pass filter to this physical-monitor path.
+- S1) VSAA8 under Node Voltages: the uncorrupted physical phase-A instantaneous voltage, not the injected error or corrupted measurement.
+
+Discover the relevant producers, consumers, units, hierarchy scopes and component definitions from the supplied base file. Do not assume fixed coordinates or component IDs. Preserve existing valid names wherever possible and use supported aliases or minimal consistent bindings when necessary. A control-signal label does not automatically create a Node Voltages-category signal. Verify the exact exported paths above. If a path cannot be provided safely in the supplied base case, identify the conflict instead of claiming compatibility.
+
+Add valid Runtime plot traces for all four requested monitoring signals so the script can retrieve their buffers using case.update_plots() and get_data(). Bind each Runtime object to its actual producing component and correct signal. Preserve existing Runtime objects and avoid duplicate or ambiguous slider names. Internal helper signals need not be exported under additional Python names, but every added input must still be driven by a valid source.
+
+Before delivery, verify the exact slider name and type, default zero state, amplitude-to-injection connection, four signal paths, physical-versus-corrupted measurement separation, and Runtime plot bindings. If the Python/RSCAD environment is available, execute the lookups and sweep to verify them. Distinguish static checks from actual compilation and runtime testing; do not claim tests were performed when they were not.
+
+Report any test-harness limitation separately, including the need to reset the slider to zero before each settling period and the need to verify buffer timestamps before interpreting the script's trip-time calculation. Do not add automatic activation or hidden resets to compensate for the script.

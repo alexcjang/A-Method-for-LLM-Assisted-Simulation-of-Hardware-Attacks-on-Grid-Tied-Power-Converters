@@ -1,0 +1,7 @@
+Trial_ID,Evaluation_Stage,ATK_MAG,Attack_Type,V_RMS_Real_kV,VPROT_Mean_pu,PhaseA_MaxAbs_Final2Cycles_kV,Protection_High_In_Buffer,Trip_Time_s,Trip_Time_Status,Data_Status
+3.3,original,0,3phase_magnitude_corruption,0.480828559,1.001284079,0.392793681,FALSE,,not_applicable_zero_bias,valid
+3.3,original,0.01,3phase_magnitude_corruption,0.480790644,1.010357405,0.392822365,FALSE,,unavailable_without_event_timestamps,valid
+3.3,original,0.05,3phase_magnitude_corruption,0.480388826,1.045473965,0.392935552,FALSE,,unavailable_without_event_timestamps,valid
+3.3,original,0.07,3phase_magnitude_corruption,0.480691551,1.061804362,0.392990609,FALSE,,unavailable_without_event_timestamps,valid
+3.3,original,0.12,3phase_magnitude_corruption,0.633637414,1,0.316070705,TRUE,,unavailable_without_event_timestamps,valid
+3.3,original,0.2,3phase_magnitude_corruption,0.602646043,1,0.388553112,TRUE,,unavailable_without_event_timestamps,valid
